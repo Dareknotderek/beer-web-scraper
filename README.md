@@ -1,106 +1,233 @@
-## Homebrewing Forum Recipe Scraper
-This Python script allows you to download recipes posted on homebrewing forums. It uses the requests and BeautifulSoup libraries to send HTTP requests and parse the HTML content of web pages. The script is designed to be simple and easy to modify to target specific websites.
+# Homebrew Recipe Scraper
 
-### Installation
-Before running the script, make sure to have Python installed and install the required libraries with the following command:
+A robust, configurable Python tool for scraping homebrew recipes from a forum, with support for pagination, retries, structured output, and logging.
 
-```pip install requests beautifulsoup4```
+---
 
-### Usage
-1. Open the script in your favorite code editor.
-2. Replace the `url` variable value with the URL of the specific homebrewing forum you want to scrape.
-3. Update the class names in the `extract_recipe` function to match the actual classes used by the forum for recipe titles, authors, dates, ingredients, and instructions.
-4. If the forum requires pagination or authentication, you'll need to modify the script to handle those requirements.
-5. Run the script with the following command:
+## Table of Contents
 
-``` python homebrew_recipe_scraper.py ```
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Requirements](#requirements)
+4. [Installation](#installation)
+5. [Usage](#usage)
+6. [Command-Line Arguments](#command-line-arguments)
+7. [Output Format](#output-format)
+8. [Customization](#customization)
+9. [Error Handling & Logging](#error-handling--logging)
+10. [Contributing](#contributing)
 
-The script will download the recipes from the specified URL and save them in a JSON file called homebrew_recipes.json. The output file will contain an array of recipe objects with the following properties:
+---
 
-- `title`: The recipe title
-- `author`: The user who posted the recipe
-- `date`: The date the recipe was posted
-- `ingredients`: The list of ingredients for the recipe
-- `instructions`: The steps to prepare the homebrew
+## Overview
 
-### Example
+This scraper navigates a homebrewing forum’s recipe section (including paginated pages), extracts structured data (title, author, date, ingredients, instructions) from each post, and saves the results to a JSON file. It employs retries, respectful delays, and a realistic User-Agent string to maximize reliability and minimize the chance of being blocked.
 
-``` [
+---
+
+## Features
+
+* **Command-Line Interface**
+  Configure start URL, output file path, and verbosity via arguments.
+* **Session with Custom Headers**
+  Uses a persistent `requests.Session` with a modern User-Agent.
+* **Automatic Retries**
+  Retries failed HTTP requests up to three times, with delays between attempts.
+* **Pagination Support**
+  Detects “next page” links (via `rel="next"`, `.next-page` CSS class, or link text “Next/More”) and follows them automatically.
+* **Structured Data Extraction**
+  Parses ingredients and instructions into lists of lines (instead of raw blobs of text).
+* **Logging**
+  Detailed logs for each page scraped, including number of posts found, retry attempts, and parsing errors.
+* **Respectful Delay**
+  A short `time.sleep(1)` between pages to avoid hammering the server.
+* **Graceful Error Handling**
+  Skips any post missing mandatory fields rather than crashing. Catches file-write errors when exporting JSON.
+* **UTF-8 Encoding**
+  Ensures proper handling of non-ASCII characters when saving JSON.
+
+---
+
+## Requirements
+
+* Python 3.7 or higher
+* The following Python libraries:
+
+  * `requests`
+  * `beautifulsoup4`
+
+You can install dependencies with:
+
+```bash
+pip install requests beautifulsoup4
+```
+
+---
+
+## Installation
+
+1. **Clone the repository** (or copy the script file):
+
+   ```bash
+   git clone https://github.com/yourusername/homebrew-recipe-scraper.git
+   cd homebrew-recipe-scraper
+   ```
+2. **Make sure dependencies are installed**:
+
+   ```bash
+   pip install requests beautifulsoup4
+   ```
+3. **Ensure the main script is executable** (if using Unix/macOS):
+
+   ```bash
+   chmod +x scrape_recipes.py
+   ```
+
+---
+
+## Usage
+
+```bash
+python scrape_recipes.py <START_URL> [OPTIONS]
+```
+
+* `<START_URL>`
+  The URL of the first page listing forum recipes (e.g., `https://www.example-homebrewing-forum.com/recipes`).
+
+* **Options**
+
+  * `-o, --output <FILE>`
+    Path to the output JSON file. Defaults to `homebrew_recipes.json`.
+  * `-v, --verbose`
+    Enable debug-level logging for detailed trace information.
+
+**Example:**
+
+```bash
+python scrape_recipes.py https://www.example-homebrewing-forum.com/recipes \
+                         -o my_recipes.json \
+                         --verbose
+```
+
+This command:
+
+1. Starts scraping at `https://www.example-homebrewing-forum.com/recipes`.
+2. Outputs the results to `my_recipes.json`.
+3. Prints debug logs to the console.
+
+---
+
+## Command-Line Arguments
+
+| Argument              | Description                                                                | Default                 |
+| --------------------- | -------------------------------------------------------------------------- | ----------------------- |
+| `<START_URL>`         | (Positional) Starting URL of the recipe listing page.                      | N/A                     |
+| `-o, --output <FILE>` | Path to the JSON file where scraped recipes will be saved.                 | `homebrew_recipes.json` |
+| `-v, --verbose`       | Activate debug logging (shows detailed internal steps and retry attempts). | Disabled                |
+
+---
+
+## Output Format
+
+The script produces a JSON array containing one object per recipe. Each recipe object has the following structure:
+
+```jsonc
+[
   {
-    "title": "Awesome IPA",
-    "author": "Brewmaster99",
-    "date": "2023-03-01",
-    "ingredients": "10 lbs Pale Malt, 2 lbs Munich Malt, 1 lb Caramel Malt, 2 oz Cascade Hops, 2 oz Citra Hops, 1 oz Amarillo Hops, 1 pkg American Ale Yeast",
-    "instructions": "Mash grains at 152°F for 60 minutes. Sparge and collect wort. Boil for 60 minutes, adding hops according to the schedule. Cool wort, pitch yeast, and ferment at 68°F for 2 weeks. Bottle or keg and enjoy!"
+    "title": "Example Recipe Title",
+    "author": "Username123",
+    "date": "2025-05-29",
+    "ingredients": [
+      "10 lbs Pale Malt",
+      "1 lb Crystal Malt 60L",
+      "1 oz Cascade Hops @ 60 min",
+      "1 oz Cascade Hops @ 15 min"
+    ],
+    "instructions": [
+      "Mash grains at 152°F for 60 minutes.",
+      "Sparge with 170°F water.",
+      "Boil for 60 minutes, adding hops as scheduled.",
+      "Chill wort to 68°F and pitch yeast."
+    ]
   },
   ...
 ]
 ```
 
-### Important Note
-Before scraping any website, ensure you comply with the site's terms of service and robots.txt file. Web scraping may be against the terms of service for some websites, and failure to comply with these terms could result in consequences such as being banned from the site.
+* **title**: The recipe’s title (string).
+* **author**: The forum username who posted the recipe (string).
+* **date**: The date string as shown on the post (string).
+* **ingredients**: A list of ingredient lines (array of strings).
+* **instructions**: A list of instruction lines (array of strings).
 
-### Customization and Advanced Usage
-The script provided is a basic template that can be customized to suit various homebrewing forums or even other types of websites. Some possible customizations and advanced usage tips are listed below.
+---
 
-### Handling Pagination
-Many forums have multiple pages of recipes. To scrape recipes from all pages, you can modify the script to loop through the pages and extract recipes. Find the pagination element on the website and adjust the loop accordingly. Here's an example:
+## Customization
 
-``` # You'll need to find the total number of pages or a way to detect the last page
-total_pages = 10
-base_url = "https://www.example-homebrewing-forum.com/recipes?page="
+1. **Adjusting CSS Selectors**
+   If your forum’s markup uses different classes or HTML tags, update the `extract_recipe(post)` function accordingly. For example:
 
-for page_num in range(1, total_pages + 1):
-    page_url = base_url + str(page_num)
-    response = requests.get(page_url)
-    soup = BeautifulSoup(response.content, "html.parser")
-    
-    # ...rest of the scraping code as shown earlier...
-``` 
+   ```python
+   title_tag = post.find("h2", class_="post-title")
+   ```
 
-### Handling Authentication
-Some forums may require user authentication to access the recipes. You can modify the script to handle authentication by using `requests.Session()` to maintain cookies between requests. This example demonstrates a basic login using a POST request:
+   or
 
-``` import requests
-from bs4 import BeautifulSoup
-import json
+   ```python
+   ingr_list_items = ingr_tag.find_all("li")
+   ingredients = [li.get_text(strip=True) for li in ingr_list_items]
+   ```
 
-# Add your login credentials here
-username = "your_username"
-password = "your_password"
+2. **Handling Additional Fields**
+   To scrape images, ratings, or tags:
 
-# Replace these URLs with the actual login and recipe URLs
-login_url = "https://www.example-homebrewing-forum.com/login"
-url = "https://www.example-homebrewing-forum.com/recipes"
+   * Locate the appropriate tag(s) in `extract_recipe()`.
+   * Add new keys to the returned dictionary:
 
-# Create a session to maintain cookies
-session = requests.Session()
+     ```python
+     recipe["rating"] = post.find("span", class_="rating").get_text(strip=True)
+     recipe["image_url"] = post.find("img", class_="recipe-image")["src"]
+     ```
 
-# Send a POST request to the login URL with the required credentials
-login_data = {"username": username, "password": password}
-session.post(login_url, data=login_data)
+3. **Modifying Pagination Logic**
 
-# Now use the session to send the GET request and parse the content with BeautifulSoup
-response = session.get(url)
-soup = BeautifulSoup(response.content, "html.parser")
+   * If your forum uses a different pattern (e.g., `?page=2` query parameter), adapt `find_next_page()` to detect and construct the “next page” URL accordingly.
+   * For JavaScript-driven pagination, consider using a headless browser (e.g., Selenium) or an API (if available).
 
-# ...rest of the scraping code as shown earlier...
-```
+4. **Export Formats**
 
-### Rate Limiting
-To avoid overloading the target website, it's a good practice to implement rate limiting or add delays between requests. You can use the time.sleep() function to add delays:
+   * To output CSV instead of JSON, import Python’s `csv` module and write rows accordingly in the `main()` function.
+   * To insert directly into a database, replace the JSON-dump block with your database client logic.
 
-``` import time
+---
 
-# Add a delay between requests (in seconds)
-delay = 2
+## Error Handling & Logging
 
-for page_num in range(1, total_pages + 1):
-    # ...scraping code...
-    
-    # Add a delay before fetching the next page
-    time.sleep(delay)
-```
+* **Network/Timeout Errors**
 
-### Conclusion
-This script provides a basic starting point for web scraping recipes from homebrewing forums. Remember to always respect the target website's terms of service and robots.txt file and customize the script to suit the specific forum you're targeting. With these customizations, you can build a more advanced web scraper to download recipes or other data from various websites.
+  * The `fetch_url()` function retries up to 3 times (with a 3-second delay) before giving up.
+  * If a page consistently fails, the scraper logs an error and moves on to stop the loop.
+
+* **Missing Fields**
+
+  * If a mandatory field (title, author, date, ingredients, or instructions) is missing, `extract_recipe()` returns `None` and the post is skipped (no crash).
+
+* **Logging Levels**
+
+  * **INFO** (default): Logs each page URL, number of posts found, and final summary.
+  * **DEBUG** (when `-v`/`--verbose` is used): Detailed traces of HTTP attempts, retries, parsing decisions, and any missing-field warnings.
+
+* **Output File Errors**
+
+  * If writing to the JSON file fails (e.g., due to permissions), an error is logged instead of a silent failure.
+
+---
+
+## Contributing
+
+1. **Fork this repository** and create a new branch for your feature or bugfix.
+2. Write clear, concise commit messages describing your changes.
+3. Update the `README.md` or documentation if you add new functionality.
+4. Submit a pull request with your proposed changes.
+
+Please adhere to the existing coding style—particularly around logging, function docstrings, and error handling.
